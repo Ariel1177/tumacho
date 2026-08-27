@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Rutinas Pro</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- html2pdf for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #a0aec0;
+            border-radius: 3px;
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #4a5568;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-100 min-h-full flex flex-col font-sans transition-colors duration-200">
+
+    <!-- Header / Navbar -->
+    <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="bg-brand-600 text-white p-2 rounded-xl shadow-md">
+                    <i class="fa-solid fa-dumbbell text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight">FitRoutine Pro</h1>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Generador de Rutinas de Entrenamiento</p>
+                </div>
+            </div>
+
+            <!-- Header Actions -->
+            <div class="flex items-center space-x-2 sm:space-x-4">
+                <button id="btn-sync" onclick="openFirebaseModal()" class="px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 flex items-center gap-2 transition">
+                    <i id="sync-icon" class="fa-solid fa-cloud"></i>
+                    <span class="hidden sm:inline" id="sync-status-text">Configurar Nube</span>
+                </button>
+
+                <button id="theme-toggle" onclick="toggleDarkMode()" class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 transition">
+                    <i id="theme-toggle-dark-icon" class="fa-solid fa-moon hidden text-lg"></i>
+                    <i id="theme-toggle-light-icon" class="fa-solid fa-sun hidden text-lg text-yellow-400"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Layout -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Navigation Tabs Sidebar / Topbar on Mobile -->
+        <div class="lg:col-span-3 space-y-4">
+            <nav class="bg-white dark:bg-gray-800 p-2 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 flex lg:flex-col gap-1 overflow-x-auto">
+                <button onclick="switchTab('creator')" id="tab-btn-creator" class="tab-btn flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition text-left whitespace-nowrap w-full bg-brand-500 text-white shadow-md">
+                    <i class="fa-solid fa-pen-to-square"></i>
+                    <span>Crear Rutina</span>
+                </button>
+                <button onclick="switchTab('library')" id="tab-btn-library" class="tab-btn flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition text-left whitespace-nowrap w-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                    <i class="fa-solid fa-layer-group"></i>
+                    <span>Rutinas Guardadas</span>
+                </button>
+                <button onclick="switchTab('exercises')" id="tab-btn-exercises" class="tab-btn flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition text-left whitespace-nowrap w-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                    <i class="fa-solid fa-list-check"></i>
+                    <span>Banco de Ejercicios</span>
+                </button>
+            </nav>
+
+            <!-- Quick Exercise Add Box -->
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 space-y-3">
+                <h3 class="font-semibold text-sm flex items-center justify-between">
+                    <span>Nuevo Ejercicio Rápido</span>
+                    <i class="fa-solid fa-plus text-brand-500"></i>
+                </h3>
+                <form id="quick-exercise-form" onsubmit="addQuickExercise(event)" class="space-y-2">
+                    <input type="text" id="quick-ex-name" placeholder="Nombre del Ejercicio *" required class="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    <select id="quick-ex-category" class="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                        <option value="Pecho">Pecho</option>
+                        <option value="Espalda">Espalda</option>
+                        <option value="Piernas">Piernas</option>
+                        <option value="Hombros">Hombros</option>
+                        <option value="Brazos">Brazos</option>
+                        <option value="Core">Core / Abdomen</option>
+                        <option value="Full Body">Full Body / Cardio</option>
+                    </select>
+                    <button type="submit" class="w-full py-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-lg text-xs font-semibold hover:opacity-90 transition">
+                        Guardar en Banco
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Dynamic Content Section -->
+        <div class="lg:col-span-9 space-y-6">
+
+            <!-- TAB 1: CREATOR -->
+            <section id="tab-creator" class="tab-content space-y-6">
+                <!-- Routine Metadata Form -->
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 space-y-4">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-gray-100 dark:border-gray-700">
+                        <div>
+                            <h2 class="text-xl font-bold">Diseñador de Rutina</h2>
+                            <p class="text-xs text-gray-500">Agrega bloques de ejercicios individuales o superseries compuestas.</p>
+                        </div>
+                        <div class="flex gap-2 w-full sm:w-auto">
+                            <button onclick="resetCreator()" class="px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                                <i class="fa-solid fa-rotate-right mr-1"></i> Limpiar
+                            </button>
+                            <button onclick="saveCurrentRoutine()" class="flex-1 sm:flex-none px-4 py-2 text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white rounded-xl shadow-sm transition flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-floppy-disk"></i> Guardar Rutina
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-semibold mb-1 text-gray-600 dark:text-gray-400">Título de la Rutina *</label>
+                            <input type="text" id="routine-title" placeholder="Ej: Rutina Hipertrofia - Torso Día A" class="w-full px-3.5 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold mb-1 text-gray-600 dark:text-gray-400">Objetivo / Atleta</label>
+                            <input type="text" id="routine-target" placeholder="Ej: Juan Pérez / Ganancia Fuerza" class="w-full px-3.5 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        </div>
+                        <div class="md:col-span-3">
+                            <label class="block text-xs font-semibold mb-1 text-gray-600 dark:text-gray-400">Notas / Indicaciones Generales (Opcional)</label>
+                            <textarea id="routine-notes" rows="2" placeholder="Ej: Realizar 10 min de calentamiento articular previo. Calentar aproximando cargas..." class="w-full px-3.5 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-brand-500 focus:outline-none resize-none"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Exercise Blocks Builder Container -->
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h3 class="font-bold text-base flex items-center gap-2">
+                            <span>Bloques de Ejercicios</span>
+                            <span id="block-counter" class="bg-gray-200 dark:bg-gray-700 text-xs px-2 py-0.5 rounded-full">0</span>
+                        </h3>
+                        <div class="flex gap-2">
+                            <button onclick="addExerciseBlock('single')" class="px-3 py-2 text-xs font-medium bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-plus"></i> Ejercicio Individual
+                            </button>
+                            <button onclick="addExerciseBlock('multiple')" class="px-3 py-2 text-xs font-medium bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-800 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-900/50 transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-layer-group"></i> Ejercicio Múltiple / Superserie
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- List of Created Blocks -->
+                    <div id="blocks-container" class="space-y-4">
+                        <!-- Empty State -->
+                        <div id="empty-blocks-state" class="text-center py-12 bg-white dark:bg-gray-800 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700 p-6">
+                            <div class="w-12 h-12 bg-brand-50 dark:bg-gray-700 text-brand-500 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <i class="fa-solid fa-dumbbell text-xl"></i>
+                            </div>
+                            <h4 class="font-semibold text-sm mb-1">Aún no hay ejercicios añadidos</h4>
+                            <p class="text-xs text-gray-500 mb-4 max-w-sm mx-auto">Comienza agregando un ejercicio individual o crea una superserie con múltiples ejercicios.</p>
+                            <div class="flex justify-center gap-2">
+                                <button onclick="addExerciseBlock('single')" class="px-3 py-1.5 text-xs font-semibold bg-brand-600 text-white rounded-lg hover:bg-brand-700">
+                                    + Ejercicio Individual
+                                </button>
+                                <button onclick="addExerciseBlock('multiple')" class="px-3 py-1.5 text-xs font-semibold bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                                    + Superserie
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: ROUTINE LIBRARY -->
+            <section id="tab-library" class="tab-content hidden space-y-4">
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold">Biblioteca de Rutinas Guardadas</h2>
+                        <p class="text-xs text-gray-500">Visualiza, edita o exporta a PDF tus rutinas en cualquier momento.</p>
+                    </div>
+                    <input type="text" id="search-routines" oninput="renderRoutinesList()" placeholder="Buscar rutina..." class="w-full sm:w-64 px-3.5 py-2 text-xs rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                </div>
+
+                <div id="routines-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Dynamic List loaded here -->
+                </div>
+            </section>
+
+            <!-- TAB 3: EXERCISE BANK -->
+            <section id="tab-exercises" class="tab-content hidden space-y-4">
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold">Banco de Ejercicios</h2>
+                        <p class="text-xs text-gray-500">Administra los ejercicios que usas con frecuencia en tus rutinas.</p>
+                    </div>
+                    <div class="flex gap-2 w-full sm:w-auto">
+                        <input type="text" id="search-exercises" oninput="renderExerciseBank()" placeholder="Filtrar ejercicios..." class="px-3.5 py-2 text-xs rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 flex-1">
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-gray-50 dark:bg-gray-700/50 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 uppercase">
+                                    <th class="p-4">Ejercicio</th>
+                                    <th class="p-4">Categoría</th>
+                                    <th class="p-4 text-right">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="exercise-table-body" class="divide-y divide-gray-100 dark:divide-gray-700 text-xs">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- PDF Preview / Print Template Container (Hidden off-screen) -->
+    <div class="hidden">
+        <div id="pdf-template" class="p-8 bg-white text-gray-900 font-sans max-w-4xl mx-auto space-y-6">
+            <!-- Header -->
+            <div class="flex justify-between items-start border-b-2 border-gray-900 pb-4">
+                <div>
+                    <h1 id="pdf-title" class="text-2xl font-black uppercase tracking-tight text-gray-900">RUTINA DE ENTRENAMIENTO</h1>
+                    <p id="pdf-target" class="text-sm text-gray-600 mt-1 font-medium">Atleta: -</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-xs font-bold text-brand-600">FitRoutine Pro</p>
+                    <p id="pdf-date" class="text-xs text-gray-500">Fecha: -</p>
+                </div>
+            </div>
+
+            <!-- Notes Section -->
+            <div id="pdf-notes-container" class="bg-gray-50 p-3 rounded-lg border border-gray-200 text-xs text-gray-700 hidden">
+                <span class="font-bold">Indicaciones General:</span> <span id="pdf-notes"></span>
+            </div>
+
+            <!-- Blocks Section -->
+            <div id="pdf-blocks" class="space-y-4">
+                <!-- PDF Dynamic Blocks -->
+            </div>
+
+            <!-- Footer -->
+            <div class="border-t border-gray-200 pt-4 text-center text-xs text-gray-400">
+                FitRoutine Pro • Generador Automático de Rutinas
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase Config Modal -->
+    <div id="firebase-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white dark:bg-gray-800 max-w-md w-full rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-6 space-y-4">
+            <div class="flex justify-between items-center border-b border-gray-100 dark:border-gray-700 pb-3">
+                <h3 class="font-bold text-base flex items-center gap-2">
+                    <i class="fa-solid fa-fire text-amber-500"></i>
+                    <span>Configurar Firebase Realtime DB</span>
+                </h3>
+                <button onclick="closeFirebaseModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <p class="text-xs text-gray-500 dark:text-gray-400">Pega tus credenciales de Firebase para sincronizar rutinas y ejercicios en la nube. Si no lo activas, la app seguirá funcionando con LocalStorage.</p>
+            
+            <form onsubmit="saveFirebaseConfig(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-medium mb-1">API Key</label>
+                    <input type="text" id="fb-apiKey" class="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium mb-1">Auth Domain</label>
+                    <input type="text" id="fb-authDomain" class="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium mb-1">Database URL *</label>
+                    <input type="text" id="fb-databaseURL" placeholder="https://tu-app-default-rtdb.firebaseio.com" class="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-brand-500 focus:outline-none" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium mb-1">Project ID</label>
+                    <input type="text" id="fb-projectId" class="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                </div>
+
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="clearFirebaseConfig()" class="px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg">
+                        Desconectar
+                    </button>
+                    <button type="submit" class="px-4 py-2 text-xs font-semibold bg-brand-600 text-white rounded-lg hover:bg-brand-700">
+                        Guardar y Conectar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Datalist for Exercise Auto-complete -->
+    <datalist id="exercise-datalist">
+        <!-- Filled dynamically -->
+    </datalist>
+
+    <!-- App Logic Script -->
+    <script>
+        // --- DATA STATE ---
+        let exerciseBank = [
+            { id: '1', name: 'Press de Banca con Barra', category: 'Pecho' },
+            { id: '2', name: 'Dominadas Pronas', category: 'Espalda' },
+            { id: '3', name: 'Sentadilla Trasera', category: 'Piernas' },
+            { id: '4', name: 'Press Militar con Mancuernas', category: 'Hombros' },
+            { id: '5', name: 'Curl de Bíceps con Barra Z', category: 'Brazos' },
+            { id: '6', name: 'Extensiones de Tríceps en Polea', category: 'Brazos' },
+            { id: '7', name: 'Peso Muerto Rumano', category: 'Piernas' },
+            { id: '8', name: 'Elevaciones Laterales', category: 'Hombros' }
+        ];
+
+        let savedRoutines = [];
+        let currentBlocks = [];
+        let firebaseApp = null;
+        let firebaseDb = null;
+        let isFirebaseConnected = false;
+
+        // --- INITIALIZATION ---
+        window.addEventListener('DOMContentLoaded', () => {
+            loadLocalStorageData();
+            initFirebaseFromStorage();
+            updateDataList();
+            renderExerciseBank();
+            renderRoutinesList();
+            setupTheme();
+        });
+
+        // --- DARK MODE CONFIG ---
+        function setupTheme() {
+            if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+                document.getElementById('theme-toggle-light-icon').classList.remove('hidden');
+            } else {
+                document.documentElement.classList.remove('dark');
+                document.getElementById('theme-toggle-dark-icon').classList.remove('hidden');
+            }
+        }
+
+        function toggleDarkMode() {
+            const darkIcon = document.getElementById('theme-toggle-dark-icon');
+            const lightIcon = document.getElementById('theme-toggle-light-icon');
+
+            if (document.documentElement.classList.contains('dark')) {
+                document.documentElement.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+                lightIcon.classList.add('hidden');
+                darkIcon.classList.remove('hidden');
+            } else {
+                document.documentElement.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+                darkIcon.classList.add('hidden');
+                lightIcon.classList.remove('hidden');
+            }
+        }
+
+        // --- LOCAL STORAGE HELPERS ---
+        function loadLocalStorageData() {
+            const localEx = localStorage.getItem('fit_exercises');
+            if (localEx) exerciseBank = JSON.parse(localEx);
+
+            const localRoutines = localStorage.getItem('fit_routines');
+            if (localRoutines) savedRoutines = JSON.parse(localRoutines);
+        }
+
+        function saveLocalStorageData() {
+            localStorage.setItem('fit_exercises', JSON.stringify(exerciseBank));
+            localStorage.setItem('fit_routines', JSON.stringify(savedRoutines));
+            updateDataList();
+            
+            if (isFirebaseConnected && firebaseDb) {
+                syncWithFirebase();
+            }
+        }
+
+        // --- FIREBASE REALTIME DB SYNC ---
+        function initFirebaseFromStorage() {
+            const fbConfigStr = localStorage.getItem('fit_firebase_config');
+            if (fbConfigStr) {
+                try {
+                    const fbConfig = JSON.parse(fbConfigStr);
+                    if (!firebase.apps.length) {
+                        firebaseApp = firebase.initializeApp(fbConfig);
+                    } else {
+                        firebaseApp = firebase.app();
+                    }
+                    firebaseDb = firebase.database();
+                    isFirebaseConnected = true;
+
+                    updateSyncUI(true);
+
+                    // Fetch remote data once connected
+                    firebaseDb.ref('fit_data').once('value', (snapshot) => {
+                        const val = snapshot.val();
+                        if (val) {
+                            if (val.exercises) exerciseBank = val.exercises;
+                            if (val.routines) savedRoutines = val.routines;
+                            saveLocalStorageData();
+                            renderExerciseBank();
+                            renderRoutinesList();
+                        }
+                    });
+
+                } catch (e) {
+                    console.error("Error al inicializar Firebase:", e);
+                    updateSyncUI(false);
+                }
+            } else {
+                updateSyncUI(false);
+            }
+        }
+
+        function syncWithFirebase() {
+            if (!isFirebaseConnected || !firebaseDb) return;
+            firebaseDb.ref('fit_data').set({
+                exercises: exerciseBank,
+                routines: savedRoutines
+            });
+        }
+
+        function updateSyncUI(connected) {
+            const icon = document.getElementById('sync-icon');
+            const text = document.getElementById('sync-status-text');
+            if (connected) {
+                icon.className = "fa-solid fa-cloud-check text-emerald-500";
+                text.innerText = "Nube Conectada";
+            } else {
+                icon.className = "fa-solid fa-cloud text-gray-400";
+                text.innerText = "Configurar Nube";
+            }
+        }
+
+        function openFirebaseModal() {
+            const fbConfigStr = localStorage.getItem('fit_firebase_config');
+            if (fbConfigStr) {
+                const cfg = JSON.parse(fbConfigStr);
+                document.getElementById('fb-apiKey').value = cfg.apiKey || '';
+                document.getElementById('fb-authDomain').value = cfg.authDomain || '';
+                document.getElementById('fb-databaseURL').value = cfg.databaseURL || '';
+                document.getElementById('fb-projectId').value = cfg.projectId || '';
+            }
+            document.getElementById('firebase-modal').classList.remove('hidden');
+        }
+
+        function closeFirebaseModal() {
+            document.getElementById('firebase-modal').classList.add('hidden');
+        }
+
+        function saveFirebaseConfig(e) {
+            e.preventDefault();
+            const config = {
+                apiKey: document.getElementById('fb-apiKey').value.trim(),
+                authDomain: document.getElementById('fb-authDomain').value.trim(),
+                databaseURL: document.getElementById('fb-databaseURL').value.trim(),
+                projectId: document.getElementById('fb-projectId').value.trim(),
+            };
+
+            localStorage.setItem('fit_firebase_config', JSON.stringify(config));
+            closeFirebaseModal();
+            initFirebaseFromStorage();
+        }
+
+        function clearFirebaseConfig() {
+            localStorage.removeItem('fit_firebase_config');
+            isFirebaseConnected = false;
+            firebaseDb = null;
+            updateSyncUI(false);
+            closeFirebaseModal();
+        }
+
+        // --- NAVIGATION TABS ---
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.className = "tab-btn flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition text-left whitespace-nowrap w-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700";
+            });
+
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`tab-btn-${tabId}`);
+            activeBtn.className = "tab-btn flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition text-left whitespace-nowrap w-full bg-brand-500 text-white shadow-md";
+        }
+
+        // --- EXERCISE BANK MANAGEMENT ---
+        function updateDataList() {
+            const datalist = document.getElementById('exercise-datalist');
+            datalist.innerHTML = exerciseBank.map(ex => `<option value="${ex.name}">`).join('');
+        }
+
+        function addQuickExercise(e) {
+            e.preventDefault();
+            const nameInput = document.getElementById('quick-ex-name');
+            const catInput = document.getElementById('quick-ex-category');
+
+            const name = nameInput.value.trim();
+            if (!name) return;
+
+            const exists = exerciseBank.some(ex => ex.name.toLowerCase() === name.toLowerCase());
+            if (!exists) {
+                exerciseBank.push({
+                    id: Date.now().toString(),
+                    name: name,
+                    category: catInput.value
+                });
+                saveLocalStorageData();
+                renderExerciseBank();
+                nameInput.value = '';
+            }
+        }
+
+        function deleteExercise(id) {
+            exerciseBank = exerciseBank.filter(ex => ex.id !== id);
+            saveLocalStorageData();
+            renderExerciseBank();
+        }
+
+        function renderExerciseBank() {
+            const tbody = document.getElementById('exercise-table-body');
+            const filter = document.getElementById('search-exercises').value.toLowerCase();
+            
+            const filtered = exerciseBank.filter(ex => 
+                ex.name.toLowerCase().includes(filter) || ex.category.toLowerCase().includes(filter)
+            );
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-gray-400">No se encontraron ejercicios.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(ex => `
+                <tr class="hover:bg-gray-50/50 dark:hover:bg-gray-700/30">
+                    <td class="p-4 font-semibold text-gray-800 dark:text-gray-200">${ex.name}</td>
+                    <td class="p-4">
+                        <span class="px-2.5 py-1 bg-gray-100 dark:bg-gray-700 rounded-md font-medium text-gray-600 dark:text-gray-300">
+                            ${ex.category}
+                        </span>
+                    </td>
+                    <td class="p-4 text-right">
+                        <button onclick="deleteExercise('${ex.id}')" class="text-rose-500 hover:text-rose-700 p-1">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // --- ROUTINE BUILDER / CREATOR LOGIC ---
+        function addExerciseBlock(type = 'single') {
+            document.getElementById('empty-blocks-state')?.remove();
+
+            const blockId = 'block_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+            const blockObj = {
+                id: blockId,
+                type: type, // 'single' or 'multiple'
+                exercises: [
+                    { name: '', sets: '', reps: '', weight: '', rir: '', rest: '' }
+                ]
+            };
+
+            if (type === 'multiple') {
+                // Superseries start with 2 exercise inputs by default
+                blockObj.exercises.push({ name: '', sets: '', reps: '', weight: '', rir: '', rest: '' });
+            }
+
+            currentBlocks.push(blockObj);
+            renderBlocks();
+        }
+
+        function removeBlock(blockId) {
+            currentBlocks = currentBlocks.filter(b => b.id !== blockId);
+            renderBlocks();
+        }
+
+        function addSubExercise(blockId) {
+            const block = currentBlocks.find(b => b.id === blockId);
+            if (block) {
+                block.exercises.push({ name: '', sets: '', reps: '', weight: '', rir: '', rest: '' });
+                renderBlocks();
+            }
+        }
+
+        function removeSubExercise(blockId, index) {
+            const block = currentBlocks.find(b => b.id === blockId);
+            if (block && block.exercises.length > 1) {
+                block.exercises.splice(index, 1);
+                renderBlocks();
+            }
+        }
+
+        function updateBlockExerciseField(blockId, exIndex, field, value) {
+            const block = currentBlocks.find(b => b.id === blockId);
+            if (block && block.exercises[exIndex]) {
+                block.exercises[exIndex][field] = value;
+
+                // Auto add to exercise bank if new exercise name is entered
+                if (field === 'name' && value.trim() !== '') {
+                    const exists = exerciseBank.some(ex => ex.name.toLowerCase() === value.trim().toLowerCase());
+                    if (!exists) {
+                        exerciseBank.push({
+                            id: Date.now().toString(),
+                            name: value.trim(),
+                            category: 'Generales'
+                        });
+                        saveLocalStorageData();
+                    }
+                }
+            }
+        }
+
+        function renderBlocks() {
+            const container = document.getElementById('blocks-container');
+            document.getElementById('block-counter').innerText = currentBlocks.length;
+
+            if (currentBlocks.length === 0) {
+                container.innerHTML = `
+                    <div id="empty-blocks-state" class="text-center py-12 bg-white dark:bg-gray-800 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700 p-6">
+                        <div class="w-12 h-12 bg-brand-50 dark:bg-gray-700 text-brand-500 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <i class="fa-solid fa-dumbbell text-xl"></i>
+                        </div>
+                        <h4 class="font-semibold text-sm mb-1">Aún no hay ejercicios añadidos</h4>
+                        <p class="text-xs text-gray-500 mb-4 max-w-sm mx-auto">Comienza agregando un ejercicio individual o crea una superserie con múltiples ejercicios.</p>
+                        <div class="flex justify-center gap-2">
+                            <button onclick="addExerciseBlock('single')" class="px-3 py-1.5 text-xs font-semibold bg-brand-600 text-white rounded-lg hover:bg-brand-700">
+                                + Ejercicio Individual
+                            </button>
+                            <button onclick="addExerciseBlock('multiple')" class="px-3 py-1.5 text-xs font-semibold bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                                + Superserie
+                            </button>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = currentBlocks.map((block, bIdx) => {
+                const isMultiple = block.type === 'multiple';
+                return `
+                    <div class="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border ${isMultiple ? 'border-purple-200 dark:border-purple-900/50 bg-purple-50/10' : 'border-gray-200 dark:border-gray-700'} relative transition">
+                        
+                        <!-- Block Header -->
+                        <div class="flex justify-between items-center mb-4 pb-2 border-b border-gray-100 dark:border-gray-700">
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-xs uppercase px-2 py-0.5 rounded-md ${isMultiple ? 'bg-purple-100 dark:bg-purple-950 text-purple-600 dark:text-purple-300' : 'bg-brand-100 dark:bg-brand-950 text-brand-600 dark:text-brand-300'}">
+                                    ${isMultiple ? 'Bloque Múltiple / Superserie' : `Bloque #${bIdx + 1}`}
+                                </span>
+                            </div>
+                            <button onclick="removeBlock('${block.id}')" class="text-gray-400 hover:text-rose-500 p-1 text-xs font-semibold flex items-center gap-1 transition">
+                                <i class="fa-solid fa-trash-can"></i>
+                                <span>Eliminar Bloque</span>
+                            </button>
+                        </div>
+
+                        <!-- Inner Exercises -->
+                        <div class="space-y-4">
+                            ${block.exercises.map((ex, exIdx) => `
+                                <div class="p-3 bg-gray-50 dark:bg-gray-700/40 rounded-xl space-y-3 relative">
+                                    ${isMultiple ? `
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-xs font-semibold text-purple-600 dark:text-purple-400">Ejercicio ${exIdx + 1} de la Superserie</span>
+                                            ${block.exercises.length > 1 ? `
+                                                <button onclick="removeSubExercise('${block.id}', ${exIdx})" class="text-rose-400 hover:text-rose-600 text-xs">
+                                                    <i class="fa-solid fa-xmark"></i> Quitar
+                                                </button>
+                                            ` : ''}
+                                        </div>
+                                    ` : ''}
+
+                                    <!-- Main Inputs Grid -->
+                                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                                        <div class="sm:col-span-12 md:col-span-4">
+                                            <label class="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">Nombre Ejercicio *</label>
+                                            <input type="text" list="exercise-datalist" value="${ex.name}" onchange="updateBlockExerciseField('${block.id}', ${exIdx}, 'name', this.value)" placeholder="Ej: Press de Banca" class="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                                        </div>
+
+                                        <div class="sm:col-span-3 md:col-span-2">
+                                            <label class="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">Series *</label>
+                                            <input type="text" value="${ex.sets}" onchange="updateBlockExerciseField('${block.id}', ${exIdx}, 'sets', this.value)" placeholder="3" class="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-500 text-center">
+                                        </div>
+
+                                        <div class="sm:col-span-3 md:col-span-2">
+                                            <label class="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">Reps / Tiempo *</label>
+                                            <input type="text" value="${ex.reps}" onchange="updateBlockExerciseField('${block.id}', ${exIdx}, 'reps', this.value)" placeholder="10-12" class="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-500 text-center">
+                                        </div>
+
+                                        <div class="sm:col-span-3 md:col-span-2">
+                                            <label class="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">Carga / Peso</label>
+                                            <input type="text" value="${ex.weight}" onchange="updateBlockExerciseField('${block.id}', ${exIdx}, 'weight', this.value)" placeholder="kg / lbs" class="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-500 text-center">
+                                        </div>
+
+                                        <div class="sm:col-span-3 md:col-span-2">
+                                            <label class="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">RIR / RPE</label>
+                                            <input type="text" value="${ex.rir}" onchange="updateBlockExerciseField('${block.id}', ${exIdx}, 'rir', this.value)" placeholder="RIR 2" class="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-500 text-center">
+                                        </div>
+                                    </div>
+
+                                    <!-- Optional Rest Field -->
+                                    <div class="flex items-center gap-2 pt-1">
+                                        <i class="fa-regular fa-clock text-gray-400 text-xs"></i>
+                                        <input type="text" value="${ex.rest}" onchange="updateBlockExerciseField('${block.id}', ${exIdx}, 'rest', this.value)" placeholder="Descanso (Opcional, ej: 90seg)" class="w-full max-w-xs px-2.5 py-1 text-xs rounded-lg border border-gray-200 dark:border-gray-600 dark:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-brand-500">
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+
+                        ${isMultiple ? `
+                            <div class="mt-3">
+                                <button onclick="addSubExercise('${block.id}')" class="text-xs font-semibold text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1">
+                                    <i class="fa-solid fa-plus"></i> Añadir otro ejercicio a la Superserie
+                                </button>
+                            </div>
+                        ` : ''}
+
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function resetCreator() {
+            document.getElementById('routine-title').value = '';
+            document.getElementById('routine-target').value = '';
+            document.getElementById('routine-notes').value = '';
+            currentBlocks = [];
+            renderBlocks();
+        }
+
+        function saveCurrentRoutine() {
+            const title = document.getElementById('routine-title').value.trim();
+            if (!title) {
+                alert('Por favor, ingresa un título para la rutina.');
+                return;
+            }
+
+            if (currentBlocks.length === 0) {
+                alert('Agrega al menos un ejercicio a la rutina.');
+                return;
+            }
+
+            const newRoutine = {
+                id: Date.now().toString(),
+                title: title,
+                target: document.getElementById('routine-target').value.trim(),
+                notes: document.getElementById('routine-notes').value.trim(),
+                date: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+                blocks: currentBlocks
+            };
+
+            savedRoutines.unshift(newRoutine);
+            saveLocalStorageData();
+            renderRoutinesList();
+            
+            alert('¡Rutina guardada exitosamente!');
+            switchTab('library');
+            resetCreator();
+        }
+
+        // --- ROUTINES LIBRARY DISPLAY & ACTIONS ---
+        function renderRoutinesList() {
+            const container = document.getElementById('routines-list');
+            const filter = document.getElementById('search-routines').value.toLowerCase();
+
+            const filtered = savedRoutines.filter(r => 
+                r.title.toLowerCase().includes(filter) || (r.target && r.target.toLowerCase().includes(filter))
+            );
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full text-center py-12 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6">
+                        <i class="fa-solid fa-folder-open text-3xl text-gray-400 mb-2"></i>
+                        <p class="text-sm font-semibold text-gray-500">No hay rutinas creadas aún.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = filtered.map(r => `
+                <div class="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col justify-between gap-4">
+                    <div>
+                        <div class="flex justify-between items-start gap-2 mb-2">
+                            <h3 class="font-bold text-base text-gray-900 dark:text-gray-100">${r.title}</h3>
+                            <span class="text-[10px] text-gray-400 whitespace-nowrap">${r.date}</span>
+                        </div>
+                        ${r.target ? `<p class="text-xs text-brand-600 dark:text-brand-400 font-medium mb-2"><i class="fa-solid fa-user text-xs mr-1"></i>${r.target}</p>` : ''}
+                        <p class="text-xs text-gray-500 line-clamp-2">${r.blocks.length} bloque(s) de ejercicios</p>
+                    </div>
+
+                    <div class="flex items-center gap-2 pt-3 border-t border-gray-100 dark:border-gray-700">
+                        <button onclick="exportRoutinePDF('${r.id}')" class="flex-1 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-file-pdf"></i> Exportar PDF
+                        </button>
+                        <button onclick="loadRoutineToCreator('${r.id}')" class="p-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 text-gray-700 dark:text-gray-200 rounded-xl text-xs font-semibold transition" title="Cargar como plantilla">
+                            <i class="fa-solid fa-copy"></i>
+                        </button>
+                        <button onclick="deleteRoutine('${r.id}')" class="p-2 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 text-rose-600 rounded-xl text-xs font-semibold transition" title="Eliminar">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function deleteRoutine(id) {
+            if (confirm('¿Seguro que deseas eliminar esta rutina?')) {
+                savedRoutines = savedRoutines.filter(r => r.id !== id);
+                saveLocalStorageData();
+                renderRoutinesList();
+            }
+        }
+
+        function loadRoutineToCreator(id) {
+            const routine = savedRoutines.find(r => r.id === id);
+            if (!routine) return;
+
+            document.getElementById('routine-title').value = routine.title + ' (Copia)';
+            document.getElementById('routine-target').value = routine.target || '';
+            document.getElementById('routine-notes').value = routine.notes || '';
+            
+            // Deep clone blocks
+            currentBlocks = JSON.parse(JSON.stringify(routine.blocks));
+            renderBlocks();
+            switchTab('creator');
+        }
+
+        // --- PDF GENERATION ---
+        function exportRoutinePDF(id) {
+            const routine = savedRoutines.find(r => r.id === id);
+            if (!routine) return;
+
+            // Fill PDF Template
+            document.getElementById('pdf-title').innerText = routine.title;
+            document.getElementById('pdf-target').innerText = routine.target ? `Atleta / Objetivo: ${routine.target}` : '';
+            document.getElementById('pdf-date').innerText = `Fecha: ${routine.date}`;
+
+            const notesContainer = document.getElementById('pdf-notes-container');
+            if (routine.notes) {
+                document.getElementById('pdf-notes').innerText = routine.notes;
+                notesContainer.classList.remove('hidden');
+            } else {
+                notesContainer.classList.add('hidden');
+            }
+
+            const blocksContainer = document.getElementById('pdf-blocks');
+            blocksContainer.innerHTML = routine.blocks.map((block, idx) => {
+                const isMultiple = block.type === 'multiple';
+                return `
+                    <div class="border border-gray-300 rounded-lg overflow-hidden">
+                        <div class="bg-gray-100 px-3 py-1.5 border-b border-gray-300 flex justify-between items-center">
+                            <span class="font-bold text-xs uppercase ${isMultiple ? 'text-purple-700' : 'text-gray-800'}">
+                                ${isMultiple ? `SUPERSERIE / CIRCUITO` : `BLOQUE ${idx + 1}`}
+                            </span>
+                        </div>
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-gray-50 border-b border-gray-200 text-gray-500 uppercase text-[9px]">
+                                    <th class="p-2">Ejercicio</th>
+                                    <th class="p-2 text-center">Series</th>
+                                    <th class="p-2 text-center">Reps</th>
+                                    <th class="p-2 text-center">Carga</th>
+                                    <th class="p-2 text-center">RIR/RPE</th>
+                                    <th class="p-2 text-center">Descanso</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                ${block.exercises.map(ex => `
+                                    <tr>
+                                        <td class="p-2 font-bold text-gray-900">${ex.name || '-'}</td>
+                                        <td class="p-2 text-center">${ex.sets || '-'}</td>
+                                        <td class="p-2 text-center">${ex.reps || '-'}</td>
+                                        <td class="p-2 text-center">${ex.weight || '-'}</td>
+                                        <td class="p-2 text-center">${ex.rir || '-'}</td>
+                                        <td class="p-2 text-center">${ex.rest || '-'}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }).join('');
+
+            // Export settings for html2pdf
+            const element = document.getElementById('pdf-template');
+            element.parentElement.classList.remove('hidden');
+
+            const opt = {
+                margin:       [0.4, 0.4, 0.4, 0.4],
+                filename:     `Rutina_${routine.title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(element).save().then(() => {
+                element.parentElement.classList.add('hidden');
+            });
+        }
+    </script>
+</body>
+</html>
